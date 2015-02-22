@@ -1,0 +1,111 @@
+### MUHAMMAD OWAIS MASOOD
+### PRACICAL MACHINE LEARNING : PROJECT
+
+```{r , warning=FALSE , echo=FALSE}
+library(plyr)
+library(caret)
+library(rpart)
+library(MASS)
+library(randomForest)
+```
+
+### DATA LOAD
+
+```{r, warning=FALSE}
+
+## LOADING TRAINING AND TESTING DATASETS
+df <- read.csv('pml-training.csv',stringsAsFactors = FALSE)
+dftesting <- read.csv('pml-testing.csv',stringsAsFactors = FALSE)
+df$classe <- as.factor(df$classe)
+
+```
+
+###  CROSS VALIDATION STRATEGY
+
+1. Split the Training Data into *Training* and *Validation* Datasets
+2. Perform *Random* Splitting on the  *Clase* Varaiblee Training Data.  80% Training 20% Validation
+
+```{r, echo = FALSE}
+## CREATING TRAINING AND VALIDATION DATASETS
+index <- createDataPartition(y=df$classe, p = 0.8, list = FALSE)
+trainingData <- df[index,]
+validationData <- df[-index,]
+```
+
+### PREPROCESSING APPROACH
+
+1. Removing variables with **>95** NA Values
+2. **100** Variables meeting the criteria
+3. Removing 7 Other Variables containing Name and TimeStamp
+4. Final model to be fitted against **53** variables
+```{r}
+#PREPROCESSING PREDICTORS
+predictors <- trainingData[,-c(1,160)]
+naColCount <-function(x){sum(is.na(x) | x == '')}
+naCount <- colwise(naColCount)(predictors)
+sum(naCount > 0) ## TOTAL NON NULL VARIABLES
+```
+
+```{r}
+temp <- naCount[,naCount > 0]
+##CREATING A CLEAN TRAINING DATASET
+cleanPredictors <- predictors[,!names(predictors) %in%  names(temp)]
+cleanTrainingDateset <-  cleanPredictors[,-(1:6)]  ##  REMOVING THE FIRST 6 VARIABLES CONTAINING NAMESS AND TIMESTAMP
+cleanTrainingDateset$classe <- as.factor(trainingData$classe)
+```
+
+### MODEL SELECTION STRATEGY
+
+1. CLASSIFICATION ALGORITHMS TO BE USED l LDA , CLASSIFICATION TREE AND  RANDOM FOREST
+2. TRAIN THESE MODELS ON THE NEW TRAINING SET ( 80%)
+3. TEST USING THE NEWLY CREATED VALIDATION DATASET( TO ASSESS OVERFITTING ISSUES)
+4. USE ACCURACY TO COMPARE AND SELECT THEE BEST MODEL FIT 
+
+```{r}
+#MODEL SELECTION (1.RANDOM FOREST 2. CLASSICATION TREE 3. LDA )
+
+rfModel <- randomForest(classe ~ . , data = cleanTrainingDateset , ntree = 10 ,  maxnoddes = 8) ##RANDOM  FOREST
+rpartModel <-  rpart(classe ~ . , data = cleanTrainingDateset) ## CLASSSIFICATION TREE
+ldaModel <- lda(classe ~ . , data = cleanTrainingDateset)## LINEAR DISCRIMINANT ANALYSIS
+
+##CROSS VALIDATION
+predictRfTraining <-  predict(rfModel , cleanTrainingDateset)
+predictRfValidation <- predict(rfModel,validationData)
+
+cmRf <- confusionMatrix(predictRfValidation,validationData$classe)
+predictTrainingRpart <- predict(rpartModel,cleanTrainingDateset , type = 'class')
+predictValidationRpart <- predict(rpartModel , validationData , type = 'class')
+
+cmRpart <- confusionMatrix(predictValidationRpart,validationData$classe)
+
+predictLdaTraining <- predict(ldaModel,cleanTrainingDateset)$class
+predictLdaValidation<- predict(ldaModel,validationData)$class
+
+```
+
+### RESULT
+
+1. **Random Forest** is the best model with an Out of Sample  accuracy rate of **0.989039**  AND OUT OF SAMPLE ERROR RATE OF  **0.011**
+2. **Linear Discriminant Analysis** had an accuracy rate of **0.7343869**
+3. **Classification Rate** was the worst performing with an accuracy of **0.6964058**
+
+```{r}
+cmRpart <- confusionMatrix(predictValidationRpart,validationData$classe)
+cmRpart <- confusionMatrix(predictValidationRpart,validationData$classe)
+cmLda <- confusionMatrix(predictLdaValidation,validationData$classe)
+
+cmRf$overall[1]
+cmRpart$overall[1]
+cmLda$overall[1]
+
+```
+## ON THE TEST DATA
+
+1. We Run the Model on the Test Set and achieve 100% Accurate Results 
+
+```{r}
+
+predictedTest <- predict(rfModel , dftesting)
+predictedTest
+
+```
